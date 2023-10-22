@@ -1,13 +1,19 @@
 from time import sleep
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 import json
 
 import pprint
 class Scraper:
     def __init__(self) -> None:
-        self.driver = webdriver.Chrome()
+        # Inicializa el navegador
+        chrome_options= Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--disable-images')
+        chrome_options.add_argument('--log-level=3')  # 3: SIN REGISTROS; 
+        self.driver = webdriver.Chrome(options=chrome_options)
 
     def create_csv(self):
         pass
