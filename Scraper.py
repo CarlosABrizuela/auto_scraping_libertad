@@ -11,6 +11,7 @@ import csv
 from datetime import datetime
 import logging
 from time import sleep
+from functools import reduce
 
 class Scraper:
     def __init__(self, config) -> None:
@@ -84,7 +85,7 @@ class Scraper:
         
         return grid_productos, item_list_element
 
-    def process_product(self, grid_productos, item_list_element):
+    def process_product(self, grid_productos, item_list_element, category):
         try:
             product_list = []
             grid_items_productos= self.find_elements(grid_productos, By.XPATH, './div') # obtenemos cada elemento del grid
@@ -94,7 +95,7 @@ class Scraper:
                 dict_prod= {
                 'nombre': producto['name'],
                 'precio_publicado': producto['offers']['offers'][0]['price'],
-                'categoria': "CATEGORIA",
+                'categoria': category,
                 'SKU': producto['sku'],
                 'url_producto': producto['@id'],
                 'stock': producto['offers']['offers'][0]['availability'],
@@ -115,21 +116,33 @@ class Scraper:
         
         return product_list
 
-    def process_category(self, url):
-        self.get_url(url)
-        grid_productos, item_list_element = self.get_gallery()
-        if not grid_productos or not item_list_element:    # si el json no tiene productos y no encuentra el grid, retorna lista vacia.En caso de usar len() luego
-            return []
-        
-        return self.process_product(grid_productos, item_list_element)
+    def process_category(self, url, category):
+        product_list= []
+        while True:
+            self.get_url(url)
+            grid_productos, item_list_element = self.get_gallery()
+            if not grid_productos or not item_list_element:    # si el json no tiene productos y no encuentra el grid, retorna lista vacia.En caso de usar len() luego
+                return []
+            
+            actual_product_list = self.process_product(grid_productos, item_list_element, category) #lista de productos pagina actual
+
+            if actual_product_list:
+                product_list.append(actual_product_list)
+                if self.more_pages(): 
+                    url = self.next_page(url)
+                    continue
+            
+            print(product_list)
+            return self.flatten(product_list)
         
 
     def run(self, categories):
         control = 0
         for category in categories:
             self.console.info(f"Procesando: {category['nombre']}")
-            url = f"{category['url']}?sc=2"
-            product_list = self.process_category(url) # hardcode de la sucursal 
+            # url = f"{category['url']}?sc=2"
+            url = 'https://www.hiperlibertad.com.ar/almacen/golosinas-y-chocolates?sc=10'
+            product_list = self.process_category(url, category['nombre']) # hardcode de la sucursal 
             if not product_list:
                 self.console.info(f'sin productos en la Categoria: {category['nombre']}. Sucursal: SUCURSAL --- {url}')
             else:
@@ -137,7 +150,7 @@ class Scraper:
                 self.console.info(f"== Sucursal SUCURSAL:\n---- Categoria {category['nombre']}: {len(product_list)} productos")
             
             #
-            if control == 1:
+            if control == 0:
                 break
             control +=1
     
@@ -190,3 +203,32 @@ class Scraper:
         except Exception as e:
             self.console.error(f'(wait element): {e}')
             return False
+    
+    def more_pages(self):
+        button = self.find_element(self.driver, By.CLASS_NAME, "vtex-search-result-3-x-buttonShowMore")
+        if button.is_displayed():
+            return True
+        else:
+            return False
+
+    def next_page(self, url):
+        base_url, query_params = url.split('?')
+        params = query_params.split('&')
+        
+        # Buscar el parámetro 'page' y aumentarlo en una unidad.
+        for i, param in enumerate(params):
+            if param.startswith('page='):
+                str, page_number_str = param.split('=')
+                page_number = int(page_number_str) + 1
+                params[i] = f'{str}={page_number}'
+                break
+        else:
+            params.insert(0,f'page=2')
+        
+        # Reconstruir la url
+        paginated_url = f'{base_url}?{"&".join(params)}'
+        self.console.info('- Nueva pagina -')
+        return paginated_url
+    
+    def flatten(self, list):
+        return reduce(lambda x, y: x + y, list, [])
