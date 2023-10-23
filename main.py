@@ -1,12 +1,12 @@
-from utility_functions import get_config
+from utility_functions import get_config, get_categories
 from Scraper import Scraper
 
 
 def main():
     config = get_config()
     scraper = Scraper(config)
-    url = 'https://www.hiperlibertad.com.ar/tecnologia/celulares-y-tablets/celulares?sc=2'
-    scraper.run(url)
+    categories = get_categories(config['categories_url'])
+    scraper.run(categories)
 
 if __name__ == "__main__":
     print("Iniciando..")

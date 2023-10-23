@@ -1,6 +1,8 @@
-proxy: False
-proxy_ip_port:
+proxy: True
+proxy_ip_port: 37.19.220.129:8443
 output_dir: C:\Users\LNKIZ\Desktop\testScrapingHLibertad\auto_scraping_libertad\salida
 thread_number: 10
 max_attempts: 2
 delay_attempts: 3
+timeout: 10
+categories_url: https://www.hiperlibertad.com.ar/api/catalog_system/pub/category/tree/3
