@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, WebDriverException 
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.support.ui import WebDriverWait 
 from selenium.webdriver.support import expected_conditions as EC
@@ -17,7 +17,7 @@ class Scraper:
         self.cf = config
         # Inicializa el navegador
         chrome_options= Options()
-        # chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-images')
         chrome_options.add_argument('--log-level=3')  # 3: SIN REGISTROS; 
         proxy_ip_port = self.cf['proxy_ip_port'] 
@@ -38,12 +38,51 @@ class Scraper:
         console_handler.setFormatter(console_formatter)
         self.console.addHandler(console_handler)
 
-    def create_csv(self, product_list, category_name, name_branch):
-        date = (datetime.today()).strftime('%d-%m-%Y')
-        df = pd.DataFrame(product_list)
-        ouput= f'{date}__{name_branch}__{category_name}.csv'
-        df.to_csv(f'{self.cf['output_dir']}/{ouput}',  quoting=csv.QUOTE_MINIMAL)
-        self.console.info(f"* Se ha generado el archivo {ouput}")
+    def get_url(self, url):
+        max_attempts = self.cf['max_attempts']
+        delay_attempts = self.cf['delay_attempts']
+        intentos = 0
+
+        while intentos < max_attempts:
+            try:
+                self.driver.get(url)
+                break
+            except WebDriverException  as e:
+                self.console.error(f"Al intentar obtener la url: {url} - Detalle: {e}")
+            except Exception as e:
+                self.console.error(f"Al intentar obtener la url: {url} - Detalle: {e}")
+                
+            self.console.info("Reintentando..")
+            intentos += 1
+            sleep(delay_attempts)
+
+    def get_gallery(self):
+        max_attempts = self.cf['max_attempts']
+        delay_attempts = self.cf['delay_attempts']
+        intentos = 0
+        grid_productos, item_list_element = None, None
+
+        while intentos < max_attempts:
+            # json con los productos
+            script_elements= self.find_elements(self.driver, By.XPATH, '//script[@type="application/ld+json"]') # existe para todas las categorias
+            item_list_element = None
+            for script_element in script_elements:
+                dict_script_element = json.loads(script_element.get_attribute('innerHTML'))
+                if dict_script_element['@type'] == "ItemList":
+                    item_list_element= dict_script_element['itemListElement']
+                    break
+
+            # Esperamos para obtener el grid con los productos
+            grid_productos= self.wait_element(By.ID, 'gallery-layout-container')
+            
+            if not item_list_element or not grid_productos:
+                intentos += 1
+                self.console.info(f'-No se encontraron los elementos de la pagina. Reintentando: quedan {max_attempts-intentos} intentos')
+                sleep(delay_attempts)
+            else:
+                return grid_productos, item_list_element
+        
+        return grid_productos, item_list_element
 
     def process_product(self, grid_productos, item_list_element):
         try:
@@ -77,19 +116,11 @@ class Scraper:
         return product_list
 
     def process_category(self, url):
-        self.driver.get(url)
-        sleep(3)
-        item_list_element= None
-        script_elements= self.find_elements(self.driver, By.XPATH, '//script[@type="application/ld+json"]')
-        print(f"scripts: ", len(script_elements))
-        for script_element in script_elements:
-            dict_script_element = json.loads(script_element.get_attribute('innerHTML'))
-            print(f"type: ", dict_script_element['@type'])
-            if dict_script_element['@type'] == "ItemList":
-                item_list_element= dict_script_element['itemListElement']
-
-        grid_productos= self.wait_element(By.ID, 'gallery-layout-container')
-
+        self.get_url(url)
+        grid_productos, item_list_element = self.get_gallery()
+        if not grid_productos or not item_list_element:    # si el json no tiene productos y no encuentra el grid, retorna lista vacia.En caso de usar len() luego
+            return []
+        
         return self.process_product(grid_productos, item_list_element)
         
 
@@ -98,14 +129,25 @@ class Scraper:
         for category in categories:
             self.console.info(f"Procesando: {category['nombre']}")
             url = f"{category['url']}?sc=2"
-            print(url)
             product_list = self.process_category(url) # hardcode de la sucursal 
-            self.create_csv(product_list, category['nombre'], "SUCURSAL")
+            if not product_list:
+                self.console.info(f'sin productos en la Categoria: {category['nombre']}. Sucursal: SUCURSAL --- {url}')
+            else:
+                self.create_csv(product_list, category['nombre'], "SUCURSAL")
+                self.console.info(f"== Sucursal SUCURSAL:\n---- Categoria {category['nombre']}: {len(product_list)} productos")
+            
             #
             if control == 1:
                 break
             control +=1
     
+    def create_csv(self, product_list, category_name, name_branch):
+        date = (datetime.today()).strftime('%d-%m-%Y')
+        df = pd.DataFrame(product_list)
+        ouput= f'{date}__{name_branch}__{category_name}.csv'
+        df.to_csv(f'{self.cf['output_dir']}/{ouput}',  quoting=csv.QUOTE_MINIMAL)
+        self.console.info(f"* Se ha generado el archivo {ouput}")
+
     def find_element(self, elemento,  by, value):
         """parameters: 
                 elemento: puede ser driver o el elemento para buscar dentro de su html
