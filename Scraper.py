@@ -4,10 +4,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 import json
+import pandas as pd
+import csv
+from datetime import datetime
 
 import pprint
 class Scraper:
-    def __init__(self) -> None:
+    def __init__(self, config) -> None:
+        self.cf = config
         # Inicializa el navegador
         chrome_options= Options()
         chrome_options.add_argument('--headless')
@@ -15,8 +19,12 @@ class Scraper:
         chrome_options.add_argument('--log-level=3')  # 3: SIN REGISTROS; 
         self.driver = webdriver.Chrome(options=chrome_options)
 
-    def create_csv(self):
-        pass
+    def create_csv(self, product_list, category_name, name_branch):
+        date = (datetime.today()).strftime('%d-%m-%Y')
+        df = pd.DataFrame(product_list)
+        ouput= f'{date}__{name_branch}__{category_name}.csv'
+        df.to_csv(f'{self.cf['output_dir']}/{ouput}',  quoting=csv.QUOTE_MINIMAL)
+        print(f"* Se ha generado el archivo {ouput}")
 
     def process_product(self, grid_productos, item_list_element):
         try:
@@ -45,14 +53,9 @@ class Scraper:
         except Exception as e:
             print(f'Hubo un error: {e}')
         
-        # return product_list
-        pprint.pprint(product_list)
+        return product_list
 
-    def process_category(self):
-        pass
-
-    def run(self, url):
-        print('main runing...')
+    def process_category(self, url):
         self.driver.get(url)
         sleep(2)
         item_list_element= None
@@ -64,7 +67,13 @@ class Scraper:
 
         grid_productos= self.find_element(self.driver,By.ID, 'gallery-layout-container')
 
-        self.process_product(grid_productos, item_list_element)
+        return self.process_product(grid_productos, item_list_element)
+        
+
+    def run(self, url):
+        print('main runing...')
+        product_list = self.process_category(url)
+        self.create_csv(product_list, "CATEGORIA", "SUCURSAL CORDOBA")
     
     def find_element(self, elemento,  by, value):
         """parameters: 
@@ -77,6 +86,9 @@ class Scraper:
         except NoSuchElementException:
             print(f"No se encontro el elemento:'{value}'")
             return False
+        except Exception as e:
+            print(f"Hubo un Error: {e}")
+            return False
     
     def find_elements(self, elemento,  by, value):
         """parameters: 
@@ -88,4 +100,7 @@ class Scraper:
             return elemento.find_elements(by, value) #elemento puede ser driver
         except NoSuchElementException:
             print(f"No se encontro el elemento: ({by})'{value}'")
+            return False
+        except Exception as e:
+            print(f"Hubo un Error: {e}")
             return False

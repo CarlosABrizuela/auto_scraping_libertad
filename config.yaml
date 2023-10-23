@@ -1,0 +1,6 @@
+proxy: False
+proxy_ip_port:
+output_dir: C:\Users\LNKIZ\Desktop\testScrapingHLibertad\auto_scraping_libertad\salida
+thread_number: 10
+max_attempts: 2
+delay_attempts: 3
