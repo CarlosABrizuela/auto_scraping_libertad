@@ -9,4 +9,6 @@ def main():
     scraper.run(url)
 
 if __name__ == "__main__":
+    print("Iniciando..")
     main()
+    print("Fin")

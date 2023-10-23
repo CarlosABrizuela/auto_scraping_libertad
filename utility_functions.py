@@ -18,5 +18,3 @@ def get_config():
         config['max_attempts']= 0
         config['delay_attempts']= 1
         return config
-    
-print(get_config())

@@ -3,12 +3,13 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 import json
 import pandas as pd
 import csv
 from datetime import datetime
+import logging
 
-import pprint
 class Scraper:
     def __init__(self, config) -> None:
         self.cf = config
@@ -17,14 +18,30 @@ class Scraper:
         chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-images')
         chrome_options.add_argument('--log-level=3')  # 3: SIN REGISTROS; 
+        proxy_ip_port = self.cf['proxy_ip_port'] 
+        if self.cf['proxy'] and proxy_ip_port:
+            proxy = Proxy()
+            proxy.proxy_type = ProxyType.MANUAL
+            proxy.http_proxy = proxy_ip_port
+            proxy.ssl_proxy = proxy_ip_port
+            chrome_options.add_argument(f"--proxy-server={proxy_ip_port}")
+
         self.driver = webdriver.Chrome(options=chrome_options)
+        #
+        # Configuración del logger
+        self.console = logging.getLogger("console_logger")
+        self.console.setLevel(logging.DEBUG)  
+        console_handler = logging.StreamHandler() 
+        console_formatter = logging.Formatter("%(levelname)s - %(message)s")
+        console_handler.setFormatter(console_formatter)
+        self.console.addHandler(console_handler)
 
     def create_csv(self, product_list, category_name, name_branch):
         date = (datetime.today()).strftime('%d-%m-%Y')
         df = pd.DataFrame(product_list)
         ouput= f'{date}__{name_branch}__{category_name}.csv'
         df.to_csv(f'{self.cf['output_dir']}/{ouput}',  quoting=csv.QUOTE_MINIMAL)
-        print(f"* Se ha generado el archivo {ouput}")
+        self.console.info(f"* Se ha generado el archivo {ouput}")
 
     def process_product(self, grid_productos, item_list_element):
         try:
@@ -51,13 +68,13 @@ class Scraper:
                 product_list.append(dict_prod)
                 
         except Exception as e:
-            print(f'Hubo un error: {e}')
+            self.console.error(e)
         
         return product_list
 
     def process_category(self, url):
         self.driver.get(url)
-        sleep(2)
+        sleep(5)
         item_list_element= None
         script_elements= self.find_elements(self.driver, By.XPATH, '//script[@type="application/ld+json"]')
         for script_element in script_elements:
@@ -71,7 +88,6 @@ class Scraper:
         
 
     def run(self, url):
-        print('main runing...')
         product_list = self.process_category(url)
         self.create_csv(product_list, "CATEGORIA", "SUCURSAL CORDOBA")
     
@@ -87,7 +103,7 @@ class Scraper:
             print(f"No se encontro el elemento:'{value}'")
             return False
         except Exception as e:
-            print(f"Hubo un Error: {e}")
+            self.console.error(e)
             return False
     
     def find_elements(self, elemento,  by, value):
@@ -102,5 +118,5 @@ class Scraper:
             print(f"No se encontro el elemento: ({by})'{value}'")
             return False
         except Exception as e:
-            print(f"Hubo un Error: {e}")
+            self.console.error(f"Hubo un Error: {e}")
             return False
