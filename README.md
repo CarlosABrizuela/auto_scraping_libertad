@@ -1,13 +1,16 @@
-# auto_scraping_libertad
+
 ![hiper libertad](https://hiperlibertad.vtexassets.com/assets/vtex/assets-builder/hiperlibertad.fizzmod-theme/1.17.1/img/retailStoreLogo___647637fa923edf985acb24aa6915109e.svg)
+# auto_scraping_libertad
 Scraping test challenge for AUTOscraping. Page: _hiperlibertad.com.ar_
 Version of python: **Python 3.12.0**, and Selenium, Request libraries.
 The goal is to get all products from the page and save them into csv files, one for every category, for every branch.
  
-Output format: date__branch-name__category-name.csv
->f.e: '31-10-2023__SUCURSAL__TV LED Y SMART TV.csv'
+* Output format: date__branch-name__category-name.csv
+>'31-10-2023__SUCURSAL__TV LED Y SMART TV.csv'
 
 ### To config the script it was used a yaml file: 'config.yaml'
+> [!NOTE]
+> Change before run.
 ```yaml
 proxy: True     # indicate if proxy will be use to connect.
 proxy_ip_port: 35.236.207.242:33333     # proxy port 
