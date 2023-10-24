@@ -1,3 +1,4 @@
+from msilib.schema import ControlEvent
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -9,13 +10,14 @@ import json
 import pandas as pd
 import csv
 from datetime import datetime
-import logging
 from time import sleep
 from functools import reduce
 
 class Scraper:
-    def __init__(self, config) -> None:
+    def __init__(self, config, branch, console) -> None:
         self.cf = config
+        self.branch = branch
+        self.console = console
         # Inicializa el navegador
         chrome_options= Options()
         chrome_options.add_argument('--headless')
@@ -30,14 +32,6 @@ class Scraper:
             chrome_options.add_argument(f"--proxy-server={proxy_ip_port}")
 
         self.driver = webdriver.Chrome(options=chrome_options)
-        #
-        # Configuración del logger
-        self.console = logging.getLogger("console_logger")
-        self.console.setLevel(logging.DEBUG)  
-        console_handler = logging.StreamHandler() 
-        console_formatter = logging.Formatter("%(levelname)s - %(message)s")
-        console_handler.setFormatter(console_formatter)
-        self.console.addHandler(console_handler)
 
     def get_url(self, url):
         max_attempts = self.cf['max_attempts']
@@ -49,7 +43,7 @@ class Scraper:
                 self.driver.get(url)
                 break
             except WebDriverException  as e:
-                self.console.error(f"Al intentar obtener la url: {url} - Detalle: {e}")
+                self.console.error(f"(proxy) Al intentar obtener la url: {url} - Detalle: {e.msg}")
             except Exception as e:
                 self.console.error(f"Al intentar obtener la url: {url} - Detalle: {e}")
                 
@@ -121,7 +115,7 @@ class Scraper:
         while True:
             self.get_url(url)
             grid_productos, item_list_element = self.get_gallery()
-            if not grid_productos or not item_list_element:    # si el json no tiene productos y no encuentra el grid, retorna lista vacia.En caso de usar len() luego
+            if not grid_productos or not item_list_element:    # si el json no tiene productos y no encuentra el grid, retorna lista vacia.En caso de usar luego
                 return []
             
             actual_product_list = self.process_product(grid_productos, item_list_element, category) #lista de productos pagina actual
@@ -132,32 +126,29 @@ class Scraper:
                     url = self.next_page(url)
                     continue
             
-            print(product_list)
             return self.flatten(product_list)
-        
 
-    def run(self, categories):
-        control = 0
+    def process_branch(self, categories):
+        CONTROL = 0
         for category in categories:
-            self.console.info(f"Procesando: {category['nombre']}")
-            # url = f"{category['url']}?sc=2"
-            url = 'https://www.hiperlibertad.com.ar/almacen/golosinas-y-chocolates?sc=10'
-            product_list = self.process_category(url, category['nombre']) # hardcode de la sucursal 
+            url = f"{category['url']}?sc={self.branch['codigo']}"
+            product_list = self.process_category(url, category['nombre'])  
             if not product_list:
-                self.console.info(f'sin productos en la Categoria: {category['nombre']}. Sucursal: SUCURSAL --- {url}')
+                self.console.info(f'Sin productos en la Categoria: {category['nombre']}. Sucursal: {self.branch['nombre']} --- {url}\n')
             else:
-                self.create_csv(product_list, category['nombre'], "SUCURSAL")
-                self.console.info(f"== Sucursal SUCURSAL:\n---- Categoria {category['nombre']}: {len(product_list)} productos")
-            
+                self.create_csv(product_list, category['nombre'])
+                self.console.info(f"== Sucursal {self.branch['nombre']}:\n---- Categoria {category['nombre']}: {len(product_list)} productos\n")
             #
-            if control == 0:
+            if CONTROL == 1:
                 break
-            control +=1
+            CONTROL +=1
+        
+        self.driver.quit()
     
-    def create_csv(self, product_list, category_name, name_branch):
+    def create_csv(self, product_list, category_name):
         date = (datetime.today()).strftime('%d-%m-%Y')
         df = pd.DataFrame(product_list)
-        ouput= f'{date}__{name_branch}__{category_name}.csv'
+        ouput= f'{date}__{self.branch['nombre']}__{category_name}.csv'
         df.to_csv(f'{self.cf['output_dir']}/{ouput}',  quoting=csv.QUOTE_MINIMAL)
         self.console.info(f"* Se ha generado el archivo {ouput}")
 

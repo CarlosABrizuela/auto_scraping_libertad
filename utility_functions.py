@@ -1,5 +1,6 @@
 import yaml 
 import requests
+import logging
 
 def get_config():
     """
@@ -55,3 +56,11 @@ def get_item_category(categorias_json):
         if index == len(categorias_json) - 1:
             return
         
+def init_logging():
+    console = logging.getLogger("console_logger")
+    console.setLevel(logging.DEBUG)  
+    console_handler = logging.StreamHandler() 
+    console_formatter = logging.Formatter("%(levelname)s - %(message)s")
+    console_handler.setFormatter(console_formatter)
+    console.addHandler(console_handler)
+    return console
