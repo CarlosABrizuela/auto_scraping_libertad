@@ -1,4 +1,3 @@
-from msilib.schema import ControlEvent
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -14,9 +13,14 @@ from time import sleep
 from functools import reduce
 
 class Scraper:
-    def __init__(self, config, branch, console) -> None:
+    def __init__(self, config, console) -> None:
+        """Constructor de la Clase. inicia las propiedades y el navegador
+
+        Args:
+            config (dict): contiene las configuraciones como la politica de reintentos, proxy, etc.
+            console (obj): para imprimir por consola
+        """
         self.cf = config
-        self.branch = branch
         self.console = console
         # Inicializa el navegador
         chrome_options= Options()
@@ -34,6 +38,11 @@ class Scraper:
         self.driver = webdriver.Chrome(options=chrome_options)
 
     def get_url(self, url):
+        """Ingresa la url en el navegador
+
+        Args:
+            url (str): url de la consulta: pagina+categoria+sucursal
+        """
         max_attempts = self.cf['max_attempts']
         delay_attempts = self.cf['delay_attempts']
         intentos = 0
@@ -52,6 +61,12 @@ class Scraper:
             sleep(delay_attempts)
 
     def get_gallery(self):
+        """ Busca los elementos del grid y el json con la informacion de los productos para la categoria actual
+
+        Returns:
+            grid_productos: contiene la lista con cada producto de la pagina html
+            item_list_element: contiene la lista de los productos en formato json
+        """
         max_attempts = self.cf['max_attempts']
         delay_attempts = self.cf['delay_attempts']
         intentos = 0
@@ -79,7 +94,17 @@ class Scraper:
         
         return grid_productos, item_list_element
 
-    def process_product(self, grid_productos, item_list_element, category):
+    def process_products(self, grid_productos, item_list_element, category):
+        """Obtiene la información de los productos y los acumula en una lista
+
+        Args:
+            grid_productos (selenium obj): lista de productos html
+            item_list_element (json): lista de productos
+            category (str): Nombre de la categoria actual
+
+        Returns:
+            lista: lista de los productos en diccionarios
+        """
         try:
             product_list = []
             grid_items_productos= self.find_elements(grid_productos, By.XPATH, './div') # obtenemos cada elemento del grid
@@ -105,12 +130,22 @@ class Scraper:
                 
         except Exception as e:
             self.console.error(f'(Procesar producto): {e}')
-            print('\n',grid_productos)
-            print('\n',item_list_element)
+            self.console.info('\n',grid_productos)
+            self.console.info('\n',item_list_element)
         
         return product_list
 
     def process_category(self, url, category):
+        """Para la categoria actual: ingresa la url en el navegador, obtiene la información de todos los 
+        productos y devuelve la lista
+
+        Args:
+            url (str): url de la categoria a procesar
+            category (str): Nombre de la categoria
+
+        Returns:
+            lista: lista de los productos
+        """
         product_list= []
         while True:
             self.get_url(url)
@@ -118,7 +153,7 @@ class Scraper:
             if not grid_productos or not item_list_element:    # si el json no tiene productos y no encuentra el grid, retorna lista vacia.En caso de usar luego
                 return []
             
-            actual_product_list = self.process_product(grid_productos, item_list_element, category) #lista de productos pagina actual
+            actual_product_list = self.process_products(grid_productos, item_list_element, category) #lista de productos pagina actual
 
             if actual_product_list:
                 product_list.append(actual_product_list)
@@ -128,16 +163,24 @@ class Scraper:
             
             return self.flatten(product_list)
 
-    def process_branch(self, categories):
+    def process_branch(self, branch, categories):
+        """ MÉTODO PRINCIPAL    
+        Para la sucursal actual, extrae todos los productos para todas las categorias y los almacena en un .csv
+        por cada categoria
+
+        Args:
+            branch (dict): diccionario con el nombre y el codigo(para construir la url) de la sucursal 
+            categories (list): lista completa de las categorias
+        """
         CONTROL = 0
         for category in categories:
-            url = f"{category['url']}?sc={self.branch['codigo']}"
+            url = f"{category['url']}?sc={branch['codigo']}"
             product_list = self.process_category(url, category['nombre'])  
             if not product_list:
-                self.console.info(f'Sin productos en la Categoria: {category['nombre']}. Sucursal: {self.branch['nombre']} --- {url}\n')
+                self.console.info(f'Sin productos en la Categoria: {category['nombre']}. Sucursal: {branch['nombre']} --- {url}\n')
             else:
-                self.create_csv(product_list, category['nombre'])
-                self.console.info(f"== Sucursal {self.branch['nombre']}:\n---- Categoria {category['nombre']}: {len(product_list)} productos\n")
+                self.create_csv(product_list, category['nombre'], branch['nombre'])
+                self.console.info(f"== Sucursal {branch['nombre']}:\n---- Categoria {category['nombre']}: {len(product_list)} productos\n")
             #
             if CONTROL == 1:
                 break
@@ -145,10 +188,17 @@ class Scraper:
         
         self.driver.quit()
     
-    def create_csv(self, product_list, category_name):
+    def create_csv(self, product_list, category_name, branch_name):
+        """Crea un archivo csv
+
+        Args:
+            product_list (list): lista de productos
+            category_name (str): Nombre de la categoria
+            branch_name (str): Nombre de la sucursal
+        """
         date = (datetime.today()).strftime('%d-%m-%Y')
         df = pd.DataFrame(product_list)
-        ouput= f'{date}__{self.branch['nombre']}__{category_name}.csv'
+        ouput= f'{date}__{branch_name}__{category_name}.csv'
         df.to_csv(f'{self.cf['output_dir']}/{ouput}',  quoting=csv.QUOTE_MINIMAL)
         self.console.info(f"* Se ha generado el archivo {ouput}")
 
@@ -161,7 +211,7 @@ class Scraper:
         try:
             return elemento.find_element(by, value) #elemento puede ser driver
         except NoSuchElementException:
-            print(f"No se encontro el elemento:'{value}'")
+            self.console.info(f"(No se encontro el elemento:'{value}')")
             return False
         except Exception as e:
             self.console.error(f'(find element): {e}')
@@ -176,13 +226,22 @@ class Scraper:
         try:
             return elemento.find_elements(by, value) #elemento puede ser driver
         except NoSuchElementException:
-            print(f"No se encontro el elemento: ({by})'{value}'")
+            self.console.info(f"(No se encontro el elemento: ({by})'{value}')")
             return False
         except Exception as e:
             self.console.error(f"(find elements): {e}")
             return False
     
     def wait_element(self, by, value):
+        """espera a que exista el elemento html para obtenerlo
+
+        Args:
+            by (By selenium): contiene el tipo de elemento que se obtendrá. class_name, id, etc.
+            value (str): Nombre o valor del elemento
+
+        Returns:
+            elemento o bool: falso, si no lo encuentra. sino el elemento
+        """
         try:
             return WebDriverWait(self.driver, self.cf['timeout']).until(EC.presence_of_element_located((by, value)))
         except TimeoutException:
@@ -196,6 +255,11 @@ class Scraper:
             return False
     
     def more_pages(self):
+        """verifica que el botón 'cargar mas' esté visible en la página
+
+        Returns:
+            True o False
+        """
         button = self.find_element(self.driver, By.CLASS_NAME, "vtex-search-result-3-x-buttonShowMore")
         if button.is_displayed():
             return True
@@ -203,6 +267,14 @@ class Scraper:
             return False
 
     def next_page(self, url):
+        """Calcula la siguiente página. añade o suma una unidad al parametro 'page' de la url
+
+        Args:
+            url (str): url de la categoria
+
+        Returns:
+            str: url actualizada
+        """
         base_url, query_params = url.split('?')
         params = query_params.split('&')
         
@@ -222,4 +294,12 @@ class Scraper:
         return paginated_url
     
     def flatten(self, list):
+        """Recibe una lista de listas, devuelve una lista llana de un nivel.
+
+        Args:
+            list (list): lista de productos
+
+        Returns:
+            list: lista de productos corregida
+        """
         return reduce(lambda x, y: x + y, list, [])
