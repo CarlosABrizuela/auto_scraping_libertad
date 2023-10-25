@@ -2,10 +2,25 @@
 ![hiper libertad](https://hiperlibertad.vtexassets.com/assets/vtex/assets-builder/hiperlibertad.fizzmod-theme/1.17.1/img/retailStoreLogo___647637fa923edf985acb24aa6915109e.svg)
 # auto_scraping_libertad
 Scraping test challenge for AUTOscraping. Page: _hiperlibertad.com.ar_
+
 Version of python: **Python 3.12.0**, and Selenium, Request libraries.
 The goal is to get all products from the page and save them into csv files, one for every category, for every branch.
+
+To achieve this, first we get the list of categories from the website, and setting it up with the page and branch parameter, as follow.
+
+- url formation
+```
+base url        : https://www.hiperlibertad.com.ar
+categoria url   : /hogar/bano
+page url        : ?page=1
+sucursal url    : ?sc=1
+```
+> 'https://www.hiperlibertad.com.ar/hogar/bano?page=1&sc=9'
  
-* Output format: date__branch-name__category-name.csv
+inside most of those pages, exist a json string, wrapped in a script tag <script type="application/ld+json">. where we get products information from. except of regular price, that we get from the list of products html.
+Doing this for every category, for every branch.
+
+- Output format: **date**__**branch-name**__**category-name****.csv**
 >'31-10-2023__SUCURSAL__TV LED Y SMART TV.csv'
 
 ### To config the script it was used a yaml file: 'config.yaml'
@@ -46,4 +61,3 @@ python main.py
 
 ## Licencia
 - Sin Licencia
-

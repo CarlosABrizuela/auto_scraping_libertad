@@ -1,5 +1,7 @@
+import json
 import yaml 
 import requests
+from requests.exceptions import ProxyError
 import logging
 
 def get_config():
@@ -22,10 +24,8 @@ def get_config():
         config['timeout'] = 5
         return config
     
-categorias =[] 
-def get_categories(url):
+def get_categories(url, config): 
     """Retorna una lista de diccionarios con las categorias y el nombre de la categoria
-
     Args:
         url (str): la url con el json de las categorias
 
@@ -33,28 +33,48 @@ def get_categories(url):
         list: lista de las categorias
         [{'nombre': , 'url': }, ...]
     """
-    response =  requests.get(url)
-    if response.ok:
-        get_item_category(response.json())
-        return categorias
-    else:
-        print(response.status_code)
-        return False
+    if config['proxy']:
+        session.proxies = config['proxy_ip_port']
 
-def get_item_category(categorias_json):
-    # Devuelve las categorias hojas, o esas que no tienen categorias hijas.
-    for index, categoria in enumerate(categorias_json):
-        if categoria["hasChildren"]:
-            get_item_category(categoria["children"])
-        else:
-            categoria_dict = {
-                "nombre": categoria["name"],
-                "url": categoria["url"]
+    with requests.session() as session:
+        try:
+            response =  session.get(url)
+            if response.ok:
+                return process_list_categories(response.json())
+            else:
+                print(response.status_code)
+                return False
+        except ProxyError as e:
+            print('(get categories) Error de proxy:', e)
+        except requests.RequestException as e:
+            print(f"(get categories) Error de solicitud: {e}.")
+    return get_local_categories()
+   
+
+def process_list_categories(categorias_json):
+    lista_sup= []
+    for category in categorias_json:
+        if category["hasChildren"]:
+            lista_sub= []
+            for child in category['children']:
+                categoria_dict = {
+                    "nombre": child['name'],
+                    "url": child["url"]
+                }
+                lista_sub.append(categoria_dict)
+
+            categoria_dict_sup ={
+                "nombre": category['name'],
+                "sub_categorias": lista_sub
             }
-            categorias.append(categoria_dict)
+        lista_sup.append(categoria_dict_sup)
+        
+    return lista_sup
 
-        if index == len(categorias_json) - 1:
-            return
+def get_local_categories():
+    # Si no puede acceder al json online. abre el local
+    with open("categorias_local.json", 'r', encoding='utf-8') as file:
+        return process_list_categories(json.load(file))
         
 def init_logging():
     console = logging.getLogger("console_logger")

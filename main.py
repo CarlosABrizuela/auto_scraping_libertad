@@ -19,8 +19,8 @@ def main():
     """Obtiene la lista de categorias, la configuración del scraper y comienza la extracción de la información
     """
     config = get_config()
-    categories = get_categories(config['categories_url'])
     console = init_logging()
+    categories = get_categories(config['categories_url'], config)
     with concurrent.futures.ThreadPoolExecutor(max_workers=config['thread_number']) as executor:
         for branch in BRANCHES: 
             executor.submit(run_scraper, branch, categories, config, console)

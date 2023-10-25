@@ -172,19 +172,30 @@ class Scraper:
             branch (dict): diccionario con el nombre y el codigo(para construir la url) de la sucursal 
             categories (list): lista completa de las categorias
         """
-        CONTROL = 0
+        CONTROL_1 = 0
         for category in categories:
-            url = f"{category['url']}?sc={branch['codigo']}"
-            product_list = self.process_category(url, category['nombre'])  
-            if not product_list:
-                self.console.info(f'Sin productos en la Categoria: {category['nombre']}. Sucursal: {branch['nombre']} --- {url}\n')
-            else:
-                self.create_csv(product_list, category['nombre'], branch['nombre'])
-                self.console.info(f"== Sucursal {branch['nombre']}:\n---- Categoria {category['nombre']}: {len(product_list)} productos\n")
+            CONTROL_2 = 0
+            product_list= []
+            for sub_category in category['sub_categorias']:
+                url = f"{sub_category['url']}?sc={branch['codigo']}"
+                category_name = f"{category['nombre']}/{sub_category['nombre']}"
+                product_list_sub = self.process_category(url, category_name)  
+                if product_list_sub:
+                    product_list.append(product_list_sub)
+                else:
+                    self.console.info(f'Sin productos en la Categoria: {category['nombre']}. Sucursal: {branch['nombre']} --- {url}\n')
+                #CONTROL SUB
+                if CONTROL_2 == 2:
+                    break
+                CONTROL_2 +=1
+
+            flattened_product_list = self.flatten(product_list)
+            self.create_csv(flattened_product_list, category['nombre'], branch['nombre'])
+            self.console.info(f"== Sucursal {branch['nombre']}:\n---- Categoria {category['nombre']}: {len(flattened_product_list)} productos\n")
             #
-            if CONTROL == 1:
+            if CONTROL_1 == 2:
                 break
-            CONTROL +=1
+            CONTROL_1 +=1
         
         self.driver.quit()
     
