@@ -1,6 +1,6 @@
 proxy: False
 proxy_ip_port: 35.236.207.242:33333
-thread_number: 1
+thread_number: 5
 max_attempts: 4
 delay_attempts: 10
 timeout: 30

@@ -1,29 +1,34 @@
 import json
+from pickle import NONE
 import yaml 
 import requests
 from requests.exceptions import ProxyError
 import logging
+import os
+from datetime import datetime
 
+main_dir = os.path.dirname(__file__)
 def get_config():
     """
     Obtiene los datos de configuracion del archivo /config.yml
     """
     try:
-        with open("config.yaml", "r") as config_file:
+        file_path = os.path.join(main_dir, 'files', 'config.yaml')
+        with open(file_path, "r") as config_file:
             config = yaml.safe_load(config_file)
             return config
     except FileNotFoundError as e:
         print(f"El archivo no se encontró. {e.filename}")
         config = {}
-        config['proxy'] = False
-        config['proxy_ip_port'] = None
-        config['output_dir'] = ''
-        config['thread_number']= 1
+        config['proxy']= False
+        config['proxy_ip_port']= None
+        config['output_dir']= ''
+        config['thread_number']= 5
         config['max_attempts']= 0
         config['delay_attempts']= 1
-        config['timeout'] = 5
+        config['timeout']= 5
         return config
-    
+
 def get_categories(url, config): 
     """Retorna una lista de diccionarios con las categorias y el nombre de la categoria
     Args:
@@ -49,7 +54,6 @@ def get_categories(url, config):
         except requests.RequestException as e:
             print(f"(get categories) Error de solicitud: {e}.")
     return get_local_categories()
-   
 
 def process_list_categories(categorias_json):
     lista_sup= []
@@ -73,14 +77,28 @@ def process_list_categories(categorias_json):
 
 def get_local_categories():
     # Si no puede acceder al json online. abre el local
-    with open("categorias_local.json", 'r', encoding='utf-8') as file:
+    file_path = os.path.join(main_dir, 'files', 'categorias_local.json')
+    with open(file_path, 'r', encoding='utf-8') as file:
         return process_list_categories(json.load(file))
-        
-def init_logging():
-    console = logging.getLogger("console_logger")
-    console.setLevel(logging.DEBUG)  
-    console_handler = logging.StreamHandler() 
-    console_formatter = logging.Formatter("%(levelname)s - %(message)s")
-    console_handler.setFormatter(console_formatter)
-    console.addHandler(console_handler)
-    return console
+
+# CONSOLE = None
+# LOG = None     
+# def init_logging():
+    # Dos niveles de loggin. por consola y reporte a un fichero
+CONSOLE = logging.getLogger("console_logger")
+CONSOLE.setLevel(logging.DEBUG)  
+console_handler = logging.StreamHandler() 
+console_formatter = logging.Formatter("%(levelname)s - %(message)s")
+console_handler.setFormatter(console_formatter)
+CONSOLE.addHandler(console_handler)
+#
+date = datetime.today().strftime('%d-%m-%Y_%H-%M-%S')
+file_path = os.path.join(main_dir, 'log', f'{date}_log.txt')
+LOG = logging.getLogger("hiper_libertad")
+LOG.setLevel(logging.INFO)  
+file_handler = logging.FileHandler(file_path)  
+file_formatter = logging.Formatter("%(asctime)s - %(name)s | %(levelname)s: %(message)s") 
+file_handler.setFormatter(file_formatter)
+LOG.addHandler(file_handler)
+
+    # return CONSOLE, LOG

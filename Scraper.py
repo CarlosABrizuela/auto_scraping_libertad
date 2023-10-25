@@ -11,9 +11,10 @@ import csv
 from datetime import datetime
 from time import sleep
 from functools import reduce
+from utility_functions import CONSOLE, LOG
 
 class Scraper:
-    def __init__(self, config, console) -> None:
+    def __init__(self, config) -> None:
         """Constructor de la Clase. inicia las propiedades y el navegador
 
         Args:
@@ -21,7 +22,6 @@ class Scraper:
             console (obj): para imprimir por consola
         """
         self.cf = config
-        self.console = console
         # Inicializa el navegador
         chrome_options= Options()
         chrome_options.add_argument('--headless')
@@ -52,11 +52,11 @@ class Scraper:
                 self.driver.get(url)
                 break
             except WebDriverException  as e:
-                self.console.error(f"(proxy) Al intentar obtener la url: {url} - Detalle: {e.msg}")
+                CONSOLE.error(f"(proxy) Al intentar obtener la url: {url} - Detalle: {e.msg}")
             except Exception as e:
-                self.console.error(f"Al intentar obtener la url: {url} - Detalle: {e}")
+                CONSOLE.error(f"Al intentar obtener la url: {url} - Detalle: {e}")
                 
-            self.console.info("Reintentando..")
+            CONSOLE.info("Reintentando..")
             intentos += 1
             sleep(delay_attempts)
 
@@ -87,7 +87,7 @@ class Scraper:
             
             if not item_list_element or not grid_productos:
                 intentos += 1
-                self.console.info(f'-No se encontraron los elementos de la pagina. Reintentando: quedan {max_attempts-intentos} intentos')
+                CONSOLE.info(f'-No se encontraron los elementos de la pagina. Reintentando: quedan {max_attempts-intentos} intentos')
                 sleep(delay_attempts)
             else:
                 return grid_productos, item_list_element
@@ -129,9 +129,10 @@ class Scraper:
                 product_list.append(dict_prod)
                 
         except Exception as e:
-            self.console.error(f'(Procesar producto): {e}')
-            self.console.info('\n',grid_productos)
-            self.console.info('\n',item_list_element)
+            CONSOLE.error(f'(Procesar producto): {e}')
+            CONSOLE.info('\n',grid_productos)
+            CONSOLE.info('\n',item_list_element)
+            LOG.error(f'(Procesar producto): {e}')
         
         return product_list
 
@@ -183,17 +184,17 @@ class Scraper:
                 if product_list_sub:
                     product_list.append(product_list_sub)
                 else:
-                    self.console.info(f'Sin productos en la Categoria: {category['nombre']}. Sucursal: {branch['nombre']} --- {url}\n')
+                    LOG.info(f'Sin productos- Categoria: {category['nombre']}. Sucursal: {branch['nombre']} --- {url}')
                 #CONTROL SUB
-                if CONTROL_2 == 2:
+                if CONTROL_2 == 0:
                     break
                 CONTROL_2 +=1
 
             flattened_product_list = self.flatten(product_list)
             self.create_csv(flattened_product_list, category['nombre'], branch['nombre'])
-            self.console.info(f"== Sucursal {branch['nombre']}:\n---- Categoria {category['nombre']}: {len(flattened_product_list)} productos\n")
+            LOG.info(f"Sucursal {branch['nombre']}. Categoria {category['nombre']}: {len(flattened_product_list)} productos")
             #
-            if CONTROL_1 == 2:
+            if CONTROL_1 == 0:
                 break
             CONTROL_1 +=1
         
@@ -211,7 +212,7 @@ class Scraper:
         df = pd.DataFrame(product_list)
         ouput= f'{date}__{branch_name}__{category_name}.csv'
         df.to_csv(f'{self.cf['output_dir']}/{ouput}',  quoting=csv.QUOTE_MINIMAL)
-        self.console.info(f"* Se ha generado el archivo {ouput}")
+        CONSOLE.info(f"* Se ha generado el archivo {ouput}")
 
     def find_element(self, elemento,  by, value):
         """parameters: 
@@ -222,10 +223,10 @@ class Scraper:
         try:
             return elemento.find_element(by, value) #elemento puede ser driver
         except NoSuchElementException:
-            self.console.info(f"(No se encontro el elemento:'{value}')")
+            # CONSOLE.info(f"(No se encontro el elemento:'{value}')")
             return False
         except Exception as e:
-            self.console.error(f'(find element): {e}')
+            CONSOLE.error(f'(find element): {e}')
             return False
     
     def find_elements(self, elemento,  by, value):
@@ -237,10 +238,10 @@ class Scraper:
         try:
             return elemento.find_elements(by, value) #elemento puede ser driver
         except NoSuchElementException:
-            self.console.info(f"(No se encontro el elemento: ({by})'{value}')")
+            CONSOLE.info(f"(No se encontro el elemento: ({by})'{value}')")
             return False
         except Exception as e:
-            self.console.error(f"(find elements): {e}")
+            CONSOLE.error(f"(find elements): {e}")
             return False
     
     def wait_element(self, by, value):
@@ -256,13 +257,13 @@ class Scraper:
         try:
             return WebDriverWait(self.driver, self.cf['timeout']).until(EC.presence_of_element_located((by, value)))
         except TimeoutException:
-            self.console.info(f"Se agoto el tiempo para: {value}")
+            CONSOLE.info(f"Se agoto el tiempo para: {value}")
             return False
         except NoSuchElementException:
-            self.console.error(f"No existe: {value}")
+            CONSOLE.error(f"No existe: {value}")
             return False
         except Exception as e:
-            self.console.error(f'(wait element): {e}')
+            CONSOLE.error(f'(wait element): {e}')
             return False
     
     def more_pages(self):
@@ -301,7 +302,7 @@ class Scraper:
         
         # Reconstruir la url
         paginated_url = f'{base_url}?{"&".join(params)}'
-        self.console.info('- Nueva pagina -')
+        CONSOLE.info('- Nueva pagina -')
         return paginated_url
     
     def flatten(self, list):
