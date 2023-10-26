@@ -81,10 +81,8 @@ def get_local_categories():
     with open(file_path, 'r', encoding='utf-8') as file:
         return process_list_categories(json.load(file))
 
-# CONSOLE = None
-# LOG = None     
-# def init_logging():
-    # Dos niveles de loggin. por consola y reporte a un fichero
+
+# # Dos niveles de loggin. por consola y reporte a un fichero
 CONSOLE = logging.getLogger("console_logger")
 CONSOLE.setLevel(logging.DEBUG)  
 console_handler = logging.StreamHandler() 
@@ -100,5 +98,3 @@ file_handler = logging.FileHandler(file_path)
 file_formatter = logging.Formatter("%(asctime)s - %(name)s | %(levelname)s: %(message)s") 
 file_handler.setFormatter(file_formatter)
 LOG.addHandler(file_handler)
-
-    # return CONSOLE, LOG

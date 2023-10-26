@@ -1,3 +1,4 @@
+from typing import Self
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -12,6 +13,7 @@ from datetime import datetime
 from time import sleep
 from functools import reduce
 from utility_functions import CONSOLE, LOG
+from files.ctes import ERROR_PAGE, NO_PRODUCTS
 
 class Scraper:
     def __init__(self, config) -> None:
@@ -130,8 +132,6 @@ class Scraper:
                 
         except Exception as e:
             CONSOLE.error(f'(Procesar producto): {e}')
-            CONSOLE.info('\n',grid_productos)
-            CONSOLE.info('\n',item_list_element)
             LOG.error(f'(Procesar producto): {e}')
         
         return product_list
@@ -150,6 +150,10 @@ class Scraper:
         product_list= []
         while True:
             self.get_url(url)
+            if not self.page_ok():
+                LOG.error(f'Categoria o Página sin productos o erronea - url {url}')
+                return product_list
+            
             grid_productos, item_list_element = self.get_gallery()
             if not grid_productos or not item_list_element:    # si el json no tiene productos y no encuentra el grid, retorna lista vacia.En caso de usar luego
                 return []
@@ -173,9 +177,9 @@ class Scraper:
             branch (dict): diccionario con el nombre y el codigo(para construir la url) de la sucursal 
             categories (list): lista completa de las categorias
         """
-        CONTROL_1 = 0
+        # CONTROL_1 = 0
         for category in categories:
-            CONTROL_2 = 0
+            # CONTROL_2 = 0
             product_list= []
             for sub_category in category['sub_categorias']:
                 url = f"{sub_category['url']}?sc={branch['codigo']}"
@@ -184,19 +188,19 @@ class Scraper:
                 if product_list_sub:
                     product_list.append(product_list_sub)
                 else:
-                    LOG.info(f'Sin productos- Categoria: {category['nombre']}. Sucursal: {branch['nombre']} --- {url}')
+                    LOG.info(f'>> No se pudo obtener productos- Sucursal: {branch['nombre']}, Categoria: {category_name}.')
                 #CONTROL SUB
-                if CONTROL_2 == 0:
-                    break
-                CONTROL_2 +=1
+                # if CONTROL_2 == 1:
+                #     break
+                # CONTROL_2 +=1
 
             flattened_product_list = self.flatten(product_list)
             self.create_csv(flattened_product_list, category['nombre'], branch['nombre'])
             LOG.info(f"Sucursal {branch['nombre']}. Categoria {category['nombre']}: {len(flattened_product_list)} productos")
             #
-            if CONTROL_1 == 0:
-                break
-            CONTROL_1 +=1
+            # if CONTROL_1 == 1:
+            #     break
+            # CONTROL_1 +=1
         
         self.driver.quit()
     
@@ -226,7 +230,7 @@ class Scraper:
             # CONSOLE.info(f"(No se encontro el elemento:'{value}')")
             return False
         except Exception as e:
-            CONSOLE.error(f'(find element): {e}')
+            # CONSOLE.error(f'(find element): {e.args}')
             return False
     
     def find_elements(self, elemento,  by, value):
@@ -241,7 +245,7 @@ class Scraper:
             CONSOLE.info(f"(No se encontro el elemento: ({by})'{value}')")
             return False
         except Exception as e:
-            CONSOLE.error(f"(find elements): {e}")
+            CONSOLE.error(f"(find elements): {e.args}")
             return False
     
     def wait_element(self, by, value):
@@ -315,3 +319,23 @@ class Scraper:
             list: lista de productos corregida
         """
         return reduce(lambda x, y: x + y, list, [])
+    
+    def page_ok(self):
+        """Verifica que la pagina pertenezca a una categoria correcta y tenga productos
+
+        Returns:
+            bool: True si tiene productos
+        """
+        no_products_category= self.find_element(self.driver, By.XPATH, f"//*[contains(text(), {NO_PRODUCTS})]")
+        error_invalid_page= self.find_element(self.driver, By.XPATH, f"//*[contains(text(), {ERROR_PAGE})]")
+        if no_products_category:
+            if no_products_category.is_displayed():
+                CONSOLE.error("La categoria no tiene productos en esta sucursal")
+                return False
+        
+        if error_invalid_page:
+            if error_invalid_page.is_displayed():
+                CONSOLE.error("La url no pertenece a una categoria")
+                return False
+        
+        return True
